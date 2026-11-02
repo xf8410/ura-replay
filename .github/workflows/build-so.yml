@@ -1,0 +1,54 @@
+name: Build SO
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-so:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+          targets: aarch64-linux-android
+
+      - name: NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: cargo-ndk
+        uses: taiki-e/install-action@cargo-ndk
+
+      - name: Build aarch64
+        run: cargo ndk -t arm64-v8a -p 24 -- build --release
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p out
+          cp target/aarch64-linux-android/release/libhachimi_ura.so out/libhachimi_ura.so
+          sha256sum out/libhachimi_ura.so > out/SHA256SUMS
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libhachimi_ura-aarch64
+          path: out/
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in v*) ;; *) TAG="ci-latest";; esac
+          gh release create "$TAG" --title "ura-replay $TAG" \
+            --notes "libhachimi_ura.so (aarch64-v8a, API 24+)" --latest || true
+          gh release upload "$TAG" out/libhachimi_ura.so out/SHA256SUMS --clobber
