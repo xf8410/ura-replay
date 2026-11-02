@@ -25,7 +25,7 @@ jobs:
           tool: cargo-ndk
 
       - name: Build aarch64
-        run: cargo ndk -t arm64-v8a -p 24 -- build --release
+        run: cargo ndk -t arm64-v8a --platform 24 -- build --release
 
       - name: Prepare artifact
         run: |
